@@ -1,0 +1,38 @@
+# Sensitive Data - NEVER COMMIT
+###################################
+
+# Active session marker
+.session
+
+# VeraCrypt container files
+*.hc
+*.vc
+*.tc
+subes.*
+
+# Session data directory (inside encrypted volume)
+data/
+
+# Mounted volume
+mnt/
+
+# Editor temporary files
+.*.swp
+*~
+.vscode/
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# System backups
+*.bak
+*.backup
