@@ -18,9 +18,14 @@ exsess/ (mounted at ~/mnt/vera)
 ├── scripts/
 │   ├── ses.sh      # Session management (open, close, status)
 │   ├── new.sh      # Register new participant (interactive form)
-│   ├── user.sh     # Quick user registration (simple input)
-│   └── ex.sh       # Exercise timer and temporal logging
-└── data/           # Session data storage with experimental records
+│   ├── ex.sh       # Exercise timer and temporal logging
+│   └── migrate.sh  # Migrate existing data to include user_uuid
+└── data/
+    ├── users.csv   # Global persistent user UUID mapping
+    └── 2026/11/23/1003/
+        ├── session.yml
+        ├── subjects.csv
+        └── exercises.csv
 ```
 
 ## Encrypted Storage Architecture
@@ -211,9 +216,53 @@ Records the precise start and stop times when each participant performs their as
   - `stop_time` - ISO 8601 timestamp (UTC) — when participant finished task
   - `duration_seconds` - Elapsed time in seconds
 
-**Data Labeling:** Use `start_time` and `stop_time` to label corresponding video frames and sensor readings collected during the participant's performance.
+**Data Labeling:** Use `start_time`, `stop_time`, and `user_uuid` to label corresponding video frames and sensor readings collected during the participant's performance.
+
+**Key Feature:** Each exercise record includes `user_uuid`, making `exercises.csv` self-contained for external video/IMU labeling tools without needing to reference other files.
+
+### `migrate.sh` - Data Migration Tool
+
+Migrates existing session data to include persistent user UUIDs. Use this when upgrading from earlier versions without user UUID support.
+
+**Usage:**
+```bash
+./scripts/migrate.sh
+```
+
+**What it does:**
+1. Creates `data/users.csv` if it doesn't exist
+2. Finds all existing `subjects.csv` files in dated session directories
+3. For each file without `user_uuid` column:
+   - Generates persistent UUID for each unique user_id
+   - Adds `user_uuid` column to subjects.csv
+   - Updates data/users.csv with user registry
+   - Creates backup as `subjects.csv.backup`
+4. Reuses existing UUIDs if user registered in multiple sessions
+
+**Output:**
+- Updated subjects.csv files with new `user_uuid` column
+- Populated data/users.csv with all participants
+- Backup files for safety
+
+**When to use:**
+- After upgrading EXSESS with user_uuid feature
+- Before exporting exercises.csv for video/IMU labeling
+- One-time operation (safe to run multiple times)
 
 ## Data Files
+
+### Global User Registry (`data/users.csv`)
+```
+user_id,user_uuid,first_registration,last_registration
+12345678Z,<UUID v7>,2026-11-23T10:05:30Z,2026-11-23T15:30:00Z
+87654321A,<UUID v7>,2026-11-20T14:22:15Z,2026-11-23T11:30:00Z
+```
+
+**Purpose:** Persistent user identification across all sessions
+- `user_id`: Participant's identifier (repeats across sessions)
+- `user_uuid`: Stable UUID (never changes, enables ML tracking)
+- `first_registration`: When participant first joined study
+- `last_registration`: Most recent session timestamp
 
 ### Session Metadata (`session.yml`)
 ```yaml
@@ -226,15 +275,30 @@ location: ""
 
 ### Subjects Data (`subjects.csv`)
 ```
-turn_id,record_uuid,user_id,age,weight,height,gender,main_hand,share
-01,<UUID v7>,12345678Z,27,75,175,Male,Right,Yes
+turn_id,record_uuid,user_uuid,user_id,age,weight,height,gender,main_hand,share
+01,<record_uuid>,<user_uuid>,12345678Z,27,75,175,Male,Right,Yes
 ```
+
+**Fields:**
+- `turn_id`: Session-specific participant ID
+- `record_uuid`: Unique session recording identifier
+- `user_uuid`: Persistent participant UUID (same across sessions)
+- `user_id`: User's identifier (DNI)
+- Remaining fields: Session-specific demographics (can change)
 
 ### Exercises Data (`exercises.csv`)
 ```
-exercise_id,turn_id,start_time,stop_time,duration_seconds
-01,01,2026-11-23T10:05:30Z,2026-11-23T10:06:45Z,75
+exercise_id,turn_id,user_uuid,start_time,stop_time,duration_seconds
+01,01,<user_uuid>,2026-11-23T10:05:30Z,2026-11-23T10:06:45Z,75
+02,02,<different_user_uuid>,2026-11-23T10:08:00Z,2026-11-23T10:09:30Z,90
 ```
+
+**Purpose:** Self-contained temporal labeling for external tools
+- `exercise_id`: Session-specific exercise sequence
+- `turn_id`: Link to participant demographics in subjects.csv
+- `user_uuid`: Persistent participant ID for multi-session correlation
+- `start_time`, `stop_time`: Exact temporal bounds for video/IMU extraction
+- `duration_seconds`: Total elapsed time
 
 ## Workflow Example
 
@@ -316,9 +380,11 @@ data/
 - Turn IDs are zero-padded to 2 digits (01, 02, 03...) for consistent file naming
 - Exercise IDs auto-increment per session
 - UUID v7 enables natural time-based sorting of records
-- Input validation differs between scripts (gum-based vs. simple read)
+- **User UUID Persistence:** `user_uuid` remains constant across sessions for multi-session ML training
+- **Self-Contained Exports:** `exercises.csv` includes `user_uuid` for direct external labeling tools
 - **Temporal Precision:** Timestamps recorded by `ex.sh` are the reference points for labeling video frames and sensor data
 - **Data Integrity:** Store the exported CSV files (`*.exercises.csv`, `subjects.csv`) with your video/sensor recordings for complete traceability
+- **Participant Tracking:** Returning participants reuse their existing `user_uuid`, automatically tracked via `data/users.csv`
 
 ## Troubleshooting
 
