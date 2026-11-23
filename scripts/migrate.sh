@@ -25,6 +25,15 @@ else
     echo "data/users.csv already exists. Skipping creation."
 fi
 
+# Initialize session.csv if it doesn't exist
+SESSION_FILE="data/session.csv"
+if [ ! -f "$SESSION_FILE" ]; then
+    echo "session_code,session_path,created_date" > "$SESSION_FILE"
+    echo "Created data/session.csv"
+else
+    echo "data/session.csv already exists. Skipping creation."
+fi
+
 echo
 
 # Find all subjects.csv files in dated session directories
@@ -46,10 +55,31 @@ echo
 for SUBJECTS_CSV in $SUBJECTS_FILES; do
     SESSION_DIR=$(dirname "$SUBJECTS_CSV")
     EXERCISES_CSV="$SESSION_DIR/exercises.csv"
+    SESSION_YML="$SESSION_DIR/session.yml"
     
     TOTAL_SESSIONS=$((TOTAL_SESSIONS + 1))
     
     echo "Processing session: $SESSION_DIR"
+    
+    # ========== RECORD SESSION IN session.csv ==========
+    
+    if [ -f "$SESSION_YML" ]; then
+        SESSION_CODE=$(awk -F': ' '/^code:/ {print $2}' "$SESSION_YML")
+        CREATED_DATE=$(awk -F': ' '/^created:/ {print $2}' "$SESSION_YML")
+        
+        if [ -n "$SESSION_CODE" ]; then
+            # Extract relative path (YYYY/MM/DD/HHMM)
+            RELATIVE_PATH=$(printf '%s' "$SESSION_DIR" | sed 's|.*/data/||')
+            
+            # Check if session already in session.csv
+            if ! grep -q "^${SESSION_CODE}," "$SESSION_FILE" 2>/dev/null; then
+                printf '%s,%s,%s\n' "$SESSION_CODE" "$RELATIVE_PATH" "$CREATED_DATE" >> "$SESSION_FILE"
+                echo "  ✓ Added session $SESSION_CODE to session.csv"
+            else
+                echo "  ✓ Session $SESSION_CODE already in session.csv"
+            fi
+        fi
+    fi
     
     # ========== MIGRATE subjects.csv ==========
     
