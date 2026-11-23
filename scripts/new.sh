@@ -34,7 +34,7 @@ get_or_create_user_uuid() {
         echo "$existing_uuid"
     else
         # New user - create entry
-        user_uuid=$(uuidgen --time-v7)
+        user_uuid=$(uuidgen --random)
         timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
         echo "$user_id,$user_uuid,$timestamp,$timestamp" >> "$users_file"
         echo "$user_uuid"

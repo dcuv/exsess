@@ -86,7 +86,7 @@ for SUBJECTS_CSV in $SUBJECTS_FILES; do
                 mv "${USERS_FILE}.tmp" "$USERS_FILE"
             else
                 # New user - create uuid
-                user_uuid=$(uuidgen --time-v7)
+                user_uuid=$(uuidgen --random)
                 session_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
                 echo "$user_id,$user_uuid,$session_time,$session_time" >> "$USERS_FILE"
             fi
