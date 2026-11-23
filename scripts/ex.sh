@@ -13,7 +13,7 @@ CSV_FILE="$SESSION_DIR/exercises.csv"
 
 # Create CSV if needed
 [ -f "$CSV_FILE" ] || \
-    echo "exercise_id,turn_id,start_time,stop_time,duration_seconds" > "$CSV_FILE"
+    echo "exercise_id,turn_id,user_uuid,start_time,stop_time,duration_seconds" > "$CSV_FILE"
 
 # Determine next exercise ID
 LAST_EX_ID=$(tail -n 1 "$CSV_FILE" | cut -d, -f1)
@@ -51,7 +51,12 @@ while true; do
     fi
 
     if grep -q "^$TURN_ID," "$SUBJECTS_CSV"; then
-        # Turn ID found, proceed
+        # Turn ID found, get user_uuid from subjects.csv
+        USER_UUID=$(grep "^$TURN_ID," "$SUBJECTS_CSV" | cut -d, -f3)
+        if [ -z "$USER_UUID" ]; then
+            gum style --foreground 196 "Error: Could not find user_uuid for Turn ID $TURN_ID" >&2
+            exit 1
+        fi
         break
     fi
 
@@ -97,9 +102,10 @@ STOP_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 DURATION=$((STOP_EPOCH - START_EPOCH))
 
 # Append to exercises CSV
-printf '%s,%s,%s,%s,%s\n' \
+printf '%s,%s,%s,%s,%s,%s\n' \
     "$EXERCISE_ID" \
     "$TURN_ID" \
+    "$USER_UUID" \
     "$START_TIME" \
     "$STOP_TIME" \
     "$DURATION" \

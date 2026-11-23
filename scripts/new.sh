@@ -11,9 +11,39 @@ fi
 SESSION_DIR=$(cat "$SESSION_FILE")
 CSV_FILE="$SESSION_DIR/subjects.csv"
 
+# Get or create persistent user UUID
+get_or_create_user_uuid() {
+    user_id="$1"
+    users_file="data/users.csv"
+    
+    # Initialize global users file if needed
+    if [ ! -f "$users_file" ]; then
+        echo "user_id,user_uuid,first_registration,last_registration" > "$users_file"
+    fi
+    
+    # Check if user exists
+    existing_uuid=$(grep "^${user_id}," "$users_file" | cut -d, -f2)
+    
+    if [ -n "$existing_uuid" ]; then
+        # User exists - update last_registration
+        timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        # Create temp file and replace original
+        grep -v "^${user_id}," "$users_file" > "${users_file}.tmp"
+        echo "$user_id,$existing_uuid,$(grep "^${user_id}," "$users_file" | cut -d, -f3),$timestamp" >> "${users_file}.tmp"
+        mv "${users_file}.tmp" "$users_file"
+        echo "$existing_uuid"
+    else
+        # New user - create entry
+        user_uuid=$(uuidgen --time-v7)
+        timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        echo "$user_id,$user_uuid,$timestamp,$timestamp" >> "$users_file"
+        echo "$user_uuid"
+    fi
+}
+
 # Create CSV if needed
 [ -f "$CSV_FILE" ] || \
-    echo "turn_id,record_uuid,user_id,age,weight,height,gender,main_hand,share" > "$CSV_FILE"
+    echo "turn_id,record_uuid,user_uuid,user_id,age,weight,height,gender,main_hand,share" > "$CSV_FILE"
 
 get_required() {
     prompt="$1"
@@ -65,13 +95,14 @@ GENDER=$(gum choose Male Female Other)
 
 clear
 echo "Main hand"
-MAIN_HAND=$(gum choose Rigth Left)
+MAIN_HAND=$(gum choose Right Left)
 
 clear
 echo "Share anonymous data"
 SHARE=$(gum choose Yes No)
 
 RECORD_UUID=$(uuidgen --time-v7)
+USER_UUID=$(get_or_create_user_uuid "$USER_ID")
 
 # Determine next turn ID
 LAST_TURN=$(tail -n 1 "$CSV_FILE" | cut -d, -f1)
@@ -86,9 +117,10 @@ clear
 TURN_ID=$(printf "%02d" "$TURN_NUM")
 
 # Append participant
-printf '%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
     "$TURN_ID" \
     "$RECORD_UUID" \
+    "$USER_UUID" \
     "$USER_ID" \
     "$AGE" \
     "$WEIGHT" \
@@ -101,4 +133,3 @@ printf '%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
 gum style --foreground 46 --bold "Participant registered."
 
 gum style --foreground 214 --bold "Please remember your turn ID: $TURN_ID"
-
