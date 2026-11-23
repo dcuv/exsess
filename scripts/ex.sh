@@ -26,19 +26,36 @@ fi
 
 EXERCISE_ID=$(printf "%02d" "$EX_NUM")
 
-# Ask for TURN_ID with strict numeric validation
+SUBJECTS_CSV="$SESSION_DIR/subjects.csv"
+
+# Ask for TURN_ID with numeric validation and existence check
 clear
 while true; do
     TURN_INPUT=$(gum input --prompt "Turn ID (numbers only, e.g., 1): " --placeholder "1")
 
     # Check if input consists solely of digits
-    if printf '%s\n' "$TURN_INPUT" | grep -Eq '^[0-9]+$'; then
-        # Format as a two-digit number (e.g., 1 -> 01)
-        TURN_ID=$(printf "%02d" "$TURN_INPUT")
+    if ! printf '%s\n' "$TURN_INPUT" | grep -Eq '^[0-9]+$'; then
+        gum style --foreground 196 "Invalid input. Turn ID must be a number." >&2
+        gum confirm "Retry?" || exit 1
+        clear
+        continue
+    fi
+
+    # Format as a two-digit number (e.g., 1 -> 01)
+    TURN_ID=$(printf "%02d" "$TURN_INPUT")
+
+    # Check if the TURN_ID exists in subjects.csv
+    if [ ! -f "$SUBJECTS_CSV" ]; then
+        gum style --foreground 196 "No participants registered. Please register participants first." >&2
+        exit 1
+    fi
+
+    if grep -q "^$TURN_ID," "$SUBJECTS_CSV"; then
+        # Turn ID found, proceed
         break
     fi
 
-    gum style --foreground 196 "Invalid input. Turn ID must be a number." >&2
+    gum style --foreground 196 "Turn ID $TURN_ID not found. Please register this participant first or try another ID." >&2
     gum confirm "Retry?" || exit 1
     clear
 done
