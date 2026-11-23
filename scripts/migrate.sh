@@ -25,13 +25,13 @@ else
     echo "data/users.csv already exists. Skipping creation."
 fi
 
-# Initialize session.csv if it doesn't exist
-SESSION_FILE="data/session.csv"
-if [ ! -f "$SESSION_FILE" ]; then
-    echo "session_code,session_path,created_date" > "$SESSION_FILE"
-    echo "Created data/session.csv"
+# Initialize sessions.csv if it doesn't exist
+SESSIONS_FILE="data/sessions.csv"
+if [ ! -f "$SESSIONS_FILE" ]; then
+    echo "session_code,session_path,created_date" > "$SESSIONS_FILE"
+    echo "Created data/sessions.csv"
 else
-    echo "data/session.csv already exists. Skipping creation."
+    echo "data/sessions.csv already exists. Skipping creation."
 fi
 
 echo
@@ -61,7 +61,7 @@ for SUBJECTS_CSV in $SUBJECTS_FILES; do
     
     echo "Processing session: $SESSION_DIR"
     
-    # ========== RECORD SESSION IN session.csv ==========
+    # ========== RECORD SESSION IN sessions.csv ==========
     
     if [ -f "$SESSION_YML" ]; then
         SESSION_CODE=$(awk -F': ' '/^code:/ {print $2}' "$SESSION_YML")
@@ -71,12 +71,12 @@ for SUBJECTS_CSV in $SUBJECTS_FILES; do
             # Extract relative path (YYYY/MM/DD/HHMM)
             RELATIVE_PATH=$(printf '%s' "$SESSION_DIR" | sed 's|.*/data/||')
             
-            # Check if session already in session.csv
-            if ! grep -q "^${SESSION_CODE}," "$SESSION_FILE" 2>/dev/null; then
-                printf '%s,%s,%s\n' "$SESSION_CODE" "$RELATIVE_PATH" "$CREATED_DATE" >> "$SESSION_FILE"
-                echo "  ✓ Added session $SESSION_CODE to session.csv"
+            # Check if session already in sessions.csv
+            if ! grep -q "^${SESSION_CODE}," "$SESSIONS_FILE" 2>/dev/null; then
+                printf '%s,%s,%s\n' "$SESSION_CODE" "$RELATIVE_PATH" "$CREATED_DATE" >> "$SESSIONS_FILE"
+                echo "  ✓ Added session $SESSION_CODE to sessions.csv"
             else
-                echo "  ✓ Session $SESSION_CODE already in session.csv"
+                echo "  ✓ Session $SESSION_CODE already in sessions.csv"
             fi
         fi
     fi

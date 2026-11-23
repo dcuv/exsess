@@ -21,14 +21,14 @@ description: ""
 location: ""
 EOF
 
-   # Record session in data/session.csv
-   SESSION_CSV="$(pwd)/data/session.csv"
-   if [ ! -f "$SESSION_CSV" ]; then
-       echo "session_code,session_path,created_date" > "$SESSION_CSV"
+   # Record session in data/sessions.csv
+   SESSIONS_CSV="$(pwd)/data/sessions.csv"
+   if [ ! -f "$SESSIONS_CSV" ]; then
+       echo "session_code,session_path,created_date" > "$SESSIONS_CSV"
    fi
    # Extract relative path from full path (remove leading "$(pwd)/")
    RELATIVE_PATH="$YEAR/$MONTH/$DAY/$SESSION"
-   printf '%s,%s,%s\n' "$CODE" "$RELATIVE_PATH" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> "$SESSION_CSV"
+   printf '%s,%s,%s\n' "$CODE" "$RELATIVE_PATH" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> "$SESSIONS_CSV"
 
    printf '%s\n' "$DIR" > "$SESSION_FILE"
    echo "Session opened:"
