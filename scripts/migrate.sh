@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # Migration script: Add user_uuid to existing session data
-# This script updates existing subjects.csv files to include user_uuid column
-# and creates the global data/users.csv mapping file
+# This script updates existing subjects.csv and exercises.csv files
+# to include user_uuid column and creates the global data/users.csv mapping file
 
 set -e
 
@@ -31,81 +31,132 @@ echo
 SUBJECTS_FILES=$(find data -type f -name "subjects.csv" 2>/dev/null)
 
 if [ -z "$SUBJECTS_FILES" ]; then
-    echo "No existing subjects.csv files found. Nothing to migrate."
+    echo "No existing subjects.csv or exercises.csv files found. Nothing to migrate."
     exit 0
 fi
 
-MIGRATED_COUNT=0
-TOTAL_COUNT=0
+SUBJECTS_MIGRATED=0
+EXERCISES_MIGRATED=0
+TOTAL_SESSIONS=0
 
-echo "Found subjects.csv files. Starting migration..."
+echo "Found session files. Starting migration..."
 echo
 
 # Process each subjects.csv file
 for SUBJECTS_CSV in $SUBJECTS_FILES; do
-    TOTAL_COUNT=$((TOTAL_COUNT + 1))
     SESSION_DIR=$(dirname "$SUBJECTS_CSV")
+    EXERCISES_CSV="$SESSION_DIR/exercises.csv"
     
-    echo "Processing: $SUBJECTS_CSV"
+    TOTAL_SESSIONS=$((TOTAL_SESSIONS + 1))
+    
+    echo "Processing session: $SESSION_DIR"
+    
+    # ========== MIGRATE subjects.csv ==========
     
     # Check if file already has user_uuid column
-    HEADER=$(head -n 1 "$SUBJECTS_CSV")
+    HEADER=$(head -n 1 "$SUBJECTS_CSV" 2>/dev/null)
     
     if echo "$HEADER" | grep -q "user_uuid"; then
-        echo "  ✓ Already has user_uuid column. Skipping."
-        echo
-        continue
+        echo "  ✓ subjects.csv already has user_uuid column"
+    else
+        echo "  → Migrating subjects.csv..."
+        SUBJECTS_MIGRATED=$((SUBJECTS_MIGRATED + 1))
+        
+        # Create backup
+        cp "$SUBJECTS_CSV" "${SUBJECTS_CSV}.backup"
+        
+        # Create new file with user_uuid column
+        NEW_CSV="${SUBJECTS_CSV}.new"
+        echo "turn_id,record_uuid,user_uuid,user_id,age,weight,height,gender,main_hand,share" > "$NEW_CSV"
+        
+        # Process each line (skip header)
+        tail -n +2 "$SUBJECTS_CSV" | while IFS=',' read -r turn_id record_uuid user_id age weight height gender main_hand share; do
+            # Check if user_uuid already exists in global users.csv
+            existing_uuid=$(grep "^${user_id}," "$USERS_FILE" 2>/dev/null | cut -d, -f2)
+            
+            if [ -n "$existing_uuid" ]; then
+                # Reuse existing user_uuid
+                user_uuid="$existing_uuid"
+                # Update last_registration timestamp
+                session_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+                first_reg=$(grep "^${user_id}," "$USERS_FILE" | cut -d, -f3)
+                # Remove old entry and add updated one
+                grep -v "^${user_id}," "$USERS_FILE" > "${USERS_FILE}.tmp"
+                echo "$user_id,$user_uuid,$first_reg,$session_time" >> "${USERS_FILE}.tmp"
+                mv "${USERS_FILE}.tmp" "$USERS_FILE"
+            else
+                # New user - create uuid
+                user_uuid=$(uuidgen --time-v7)
+                session_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+                echo "$user_id,$user_uuid,$session_time,$session_time" >> "$USERS_FILE"
+            fi
+            
+            # Write to new CSV with user_uuid in correct position
+            printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+                "$turn_id" \
+                "$record_uuid" \
+                "$user_uuid" \
+                "$user_id" \
+                "$age" \
+                "$weight" \
+                "$height" \
+                "$gender" \
+                "$main_hand" \
+                "$share" >> "$NEW_CSV"
+        done
+        
+        # Replace original with new file
+        mv "$NEW_CSV" "$SUBJECTS_CSV"
+        echo "    ✓ subjects.csv migrated"
     fi
     
-    MIGRATED_COUNT=$((MIGRATED_COUNT + 1))
+    # ========== MIGRATE exercises.csv ==========
     
-    # Create backup
-    cp "$SUBJECTS_CSV" "${SUBJECTS_CSV}.backup"
-    echo "  → Created backup: ${SUBJECTS_CSV}.backup"
-    
-    # Create new file with user_uuid column
-    NEW_CSV="${SUBJECTS_CSV}.new"
-    echo "turn_id,record_uuid,user_uuid,user_id,age,weight,height,gender,main_hand,share" > "$NEW_CSV"
-    
-    # Process each line (skip header)
-    tail -n +2 "$SUBJECTS_CSV" | while IFS=',' read -r turn_id record_uuid user_id age weight height gender main_hand share; do
-        # Check if user_uuid already exists in global users.csv
-        existing_uuid=$(grep "^${user_id}," "$USERS_FILE" 2>/dev/null | cut -d, -f2)
+    if [ ! -f "$EXERCISES_CSV" ]; then
+        echo "  ○ No exercises.csv found in this session"
+    else
+        # Check if file already has user_uuid column
+        HEADER=$(head -n 1 "$EXERCISES_CSV" 2>/dev/null)
         
-        if [ -n "$existing_uuid" ]; then
-            # Reuse existing user_uuid
-            user_uuid="$existing_uuid"
-            # Update last_registration timestamp
-            session_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-            first_reg=$(grep "^${user_id}," "$USERS_FILE" | cut -d, -f3)
-            # Remove old entry and add updated one
-            grep -v "^${user_id}," "$USERS_FILE" > "${USERS_FILE}.tmp"
-            echo "$user_id,$user_uuid,$first_reg,$session_time" >> "${USERS_FILE}.tmp"
-            mv "${USERS_FILE}.tmp" "$USERS_FILE"
+        if echo "$HEADER" | grep -q "user_uuid"; then
+            echo "  ✓ exercises.csv already has user_uuid column"
         else
-            # New user - create uuid
-            user_uuid=$(uuidgen --time-v7)
-            session_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-            echo "$user_id,$user_uuid,$session_time,$session_time" >> "$USERS_FILE"
+            echo "  → Migrating exercises.csv..."
+            EXERCISES_MIGRATED=$((EXERCISES_MIGRATED + 1))
+            
+            # Create backup
+            cp "$EXERCISES_CSV" "${EXERCISES_CSV}.backup"
+            
+            # Create new file with user_uuid column
+            NEW_CSV="${EXERCISES_CSV}.new"
+            echo "exercise_id,turn_id,user_uuid,start_time,stop_time,duration_seconds" > "$NEW_CSV"
+            
+            # Process each line (skip header)
+            # Need to look up user_uuid from subjects.csv
+            tail -n +2 "$EXERCISES_CSV" | while IFS=',' read -r exercise_id turn_id start_time stop_time duration_seconds; do
+                # Look up user_uuid from subjects.csv by turn_id
+                user_uuid=$(grep "^$turn_id," "$SUBJECTS_CSV" 2>/dev/null | cut -d, -f3)
+                
+                if [ -z "$user_uuid" ]; then
+                    echo "Warning: Could not find user_uuid for turn_id $turn_id in $SUBJECTS_CSV" >&2
+                    user_uuid="unknown"
+                fi
+                
+                # Write to new CSV
+                printf '%s,%s,%s,%s,%s,%s\n' \
+                    "$exercise_id" \
+                    "$turn_id" \
+                    "$user_uuid" \
+                    "$start_time" \
+                    "$stop_time" \
+                    "$duration_seconds" >> "$NEW_CSV"
+            done
+            
+            # Replace original with new file
+            mv "$NEW_CSV" "$EXERCISES_CSV"
+            echo "    ✓ exercises.csv migrated"
         fi
-        
-        # Write to new CSV with user_uuid in correct position
-        printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
-            "$turn_id" \
-            "$record_uuid" \
-            "$user_uuid" \
-            "$user_id" \
-            "$age" \
-            "$weight" \
-            "$height" \
-            "$gender" \
-            "$main_hand" \
-            "$share" >> "$NEW_CSV"
-    done
-    
-    # Replace original with new file
-    mv "$NEW_CSV" "$SUBJECTS_CSV"
-    echo "  ✓ Migrated: Added user_uuid column to $TOTAL_COUNT records"
+    fi
     
     echo
 done
@@ -113,16 +164,17 @@ done
 echo
 echo "Migration Complete!"
 echo "==================="
-echo "Migrated: $MIGRATED_COUNT file(s)"
-echo "Total processed: $TOTAL_COUNT file(s)"
+echo "Sessions processed: $TOTAL_SESSIONS"
+echo "subjects.csv files migrated: $SUBJECTS_MIGRATED"
+echo "exercises.csv files migrated: $EXERCISES_MIGRATED"
 echo
-echo "✓ All subjects.csv files now include user_uuid"
+echo "✓ All CSV files now include user_uuid"
 echo "✓ data/users.csv updated with user mappings"
 echo
 
 echo "Next steps:"
-echo "1. Test that ex.sh works correctly with exercises.csv"
-echo "2. Verify data/users.csv has all participants"
-echo "3. Check that user_uuid appears in exercises.csv when recording"
+echo "1. Verify data/users.csv has all participants"
+echo "2. Check exercises.csv has user_uuid column"
+echo "3. Test that ex.sh works correctly"
 echo
 echo "Backups of original files saved as *.backup"
