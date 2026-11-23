@@ -131,9 +131,8 @@ for SUBJECTS_CSV in $SUBJECTS_FILES; do
             NEW_CSV="${EXERCISES_CSV}.new"
             echo "exercise_id,turn_id,user_uuid,start_time,stop_time,duration_seconds" > "$NEW_CSV"
             
-            # Process each line (skip header)
-            # Need to look up user_uuid from subjects.csv
-            tail -n +2 "$EXERCISES_CSV" | while IFS=',' read -r exercise_id turn_id start_time stop_time duration_seconds; do
+            # Process each line (skip header) without subshell
+            while IFS=',' read -r exercise_id turn_id start_time stop_time duration_seconds; do
                 # Look up user_uuid from subjects.csv by turn_id
                 user_uuid=$(grep "^$turn_id," "$SUBJECTS_CSV" 2>/dev/null | cut -d, -f3)
                 
@@ -150,7 +149,7 @@ for SUBJECTS_CSV in $SUBJECTS_FILES; do
                     "$start_time" \
                     "$stop_time" \
                     "$duration_seconds" >> "$NEW_CSV"
-            done
+            done < <(tail -n +2 "$EXERCISES_CSV")
             
             # Replace original with new file
             mv "$NEW_CSV" "$EXERCISES_CSV"
