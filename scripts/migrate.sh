@@ -115,45 +115,61 @@ for SUBJECTS_CSV in $SUBJECTS_FILES; do
     if [ ! -f "$EXERCISES_CSV" ]; then
         echo "  ○ No exercises.csv found in this session"
     else
-        # Check if file already has user_uuid column
-        HEADER=$(head -n 1 "$EXERCISES_CSV" 2>/dev/null)
+        # Get session code from session.yml
+        SESSION_YML="$SESSION_DIR/session.yml"
+        SESSION_CODE=$(awk -F': ' '/^code:/ {print $2}' "$SESSION_YML" 2>/dev/null)
         
-        if echo "$HEADER" | grep -q "user_uuid"; then
-            echo "  ✓ exercises.csv already has user_uuid column"
+        if [ -z "$SESSION_CODE" ]; then
+            echo "  ✗ Warning: Could not find session code in $SESSION_YML"
+            echo "    Skipping exercises.csv migration for this session"
         else
-            echo "  → Migrating exercises.csv..."
-            EXERCISES_MIGRATED=$((EXERCISES_MIGRATED + 1))
+            # Check if file already has exercise_uuid column
+            HEADER=$(head -n 1 "$EXERCISES_CSV" 2>/dev/null)
             
-            # Create backup
-            cp "$EXERCISES_CSV" "${EXERCISES_CSV}.backup"
-            
-            # Create new file with user_uuid column
-            NEW_CSV="${EXERCISES_CSV}.new"
-            echo "exercise_id,turn_id,user_uuid,start_time,stop_time,duration_seconds" > "$NEW_CSV"
-            
-            # Process each line (skip header) without subshell
-            while IFS=',' read -r exercise_id turn_id start_time stop_time duration_seconds; do
-                # Look up user_uuid from subjects.csv by turn_id
-                user_uuid=$(grep "^$turn_id," "$SUBJECTS_CSV" 2>/dev/null | cut -d, -f3)
+            if echo "$HEADER" | grep -q "exercise_uuid"; then
+                echo "  ✓ exercises.csv already has exercise_uuid and user_uuid columns"
+            else
+                echo "  → Migrating exercises.csv..."
+                EXERCISES_MIGRATED=$((EXERCISES_MIGRATED + 1))
                 
-                if [ -z "$user_uuid" ]; then
-                    echo "Warning: Could not find user_uuid for turn_id $turn_id in $SUBJECTS_CSV" >&2
-                    user_uuid="unknown"
-                fi
+                # Create backup
+                cp "$EXERCISES_CSV" "${EXERCISES_CSV}.backup"
                 
-                # Write to new CSV
-                printf '%s,%s,%s,%s,%s,%s\n' \
-                    "$exercise_id" \
-                    "$turn_id" \
-                    "$user_uuid" \
-                    "$start_time" \
-                    "$stop_time" \
-                    "$duration_seconds" >> "$NEW_CSV"
-            done < <(tail -n +2 "$EXERCISES_CSV")
-            
-            # Replace original with new file
-            mv "$NEW_CSV" "$EXERCISES_CSV"
-            echo "    ✓ exercises.csv migrated"
+                # Create new file with exercise_uuid and user_uuid columns
+                NEW_CSV="${EXERCISES_CSV}.new"
+                echo "exercise_id,exercise_uuid,turn_id,user_uuid,start_time,stop_time,duration_seconds" > "$NEW_CSV"
+                
+                # Process each line (skip header) without subshell
+                EX_NUM=1
+                while IFS=',' read -r exercise_id turn_id start_time stop_time duration_seconds; do
+                    # Generate exercise_uuid with session code as prefix
+                    exercise_uuid="${SESSION_CODE}_$(printf '%02d' "$EX_NUM")"
+                    
+                    # Look up user_uuid from subjects.csv by turn_id
+                    user_uuid=$(grep "^$turn_id," "$SUBJECTS_CSV" 2>/dev/null | cut -d, -f3)
+                    
+                    if [ -z "$user_uuid" ]; then
+                        echo "Warning: Could not find user_uuid for turn_id $turn_id in $SUBJECTS_CSV" >&2
+                        user_uuid="unknown"
+                    fi
+                    
+                    # Write to new CSV
+                    printf '%s,%s,%s,%s,%s,%s,%s\n' \
+                        "$exercise_id" \
+                        "$exercise_uuid" \
+                        "$turn_id" \
+                        "$user_uuid" \
+                        "$start_time" \
+                        "$stop_time" \
+                        "$duration_seconds" >> "$NEW_CSV"
+                    
+                    EX_NUM=$((EX_NUM + 1))
+                done < <(tail -n +2 "$EXERCISES_CSV")
+                
+                # Replace original with new file
+                mv "$NEW_CSV" "$EXERCISES_CSV"
+                echo "    ✓ exercises.csv migrated with exercise_uuid"
+            fi
         fi
     fi
     

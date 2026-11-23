@@ -11,9 +11,13 @@ fi
 SESSION_DIR=$(cat "$SESSION_FILE")
 CSV_FILE="$SESSION_DIR/exercises.csv"
 
+# Get session code from session.yml
+SESSION_YML="$SESSION_DIR/session.yml"
+SESSION_CODE=$(awk -F': ' '/^code:/ {print $2}' "$SESSION_YML")
+
 # Create CSV if needed
 [ -f "$CSV_FILE" ] || \
-    echo "exercise_id,turn_id,user_uuid,start_time,stop_time,duration_seconds" > "$CSV_FILE"
+    echo "exercise_id,exercise_uuid,turn_id,user_uuid,start_time,stop_time,duration_seconds" > "$CSV_FILE"
 
 # Determine next exercise ID
 LAST_EX_ID=$(tail -n 1 "$CSV_FILE" | cut -d, -f1)
@@ -101,9 +105,13 @@ STOP_EPOCH=$(date +%s)
 STOP_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 DURATION=$((STOP_EPOCH - START_EPOCH))
 
+# Generate exercise_uuid with session code as prefix
+EXERCISE_UUID="${SESSION_CODE}_$(printf '%02d' "$EX_NUM")"
+
 # Append to exercises CSV
-printf '%s,%s,%s,%s,%s,%s\n' \
+printf '%s,%s,%s,%s,%s,%s,%s\n' \
     "$EXERCISE_ID" \
+    "$EXERCISE_UUID" \
     "$TURN_ID" \
     "$USER_UUID" \
     "$START_TIME" \
