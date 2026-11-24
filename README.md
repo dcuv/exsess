@@ -19,13 +19,16 @@ exsess/ (mounted at ~/mnt/vera)
 │   ├── ses.sh      # Session management (open, close, status)
 │   ├── new.sh      # Register new participant (interactive form)
 │   ├── ex.sh       # Exercise timer and temporal logging
+│   ├── rec.sh      # Webcam & audio video recording
 │   └── migrate.sh  # Migrate existing data to include user_uuid
 └── data/
-    ├── users.csv   # Global persistent user UUID mapping
-    └── 2026/11/23/1003/
-        ├── session.yml
-        ├── subjects.csv
-        └── exercises.csv
+    ├── users.csv    # Global persistent user UUID mapping
+    ├── sessions.csv # Registry mapping session code to session path and creation date
+    └── sessions/
+        └── A1B2C3/  # Session directory named by SESSION_CODE
+            ├── session.yml
+            ├── subjects.csv
+            └── exercises.csv
 ```
 
 ## Encrypted Storage Architecture
@@ -130,7 +133,7 @@ Manages experiment sessions with hierarchical directory structure and metadata.
 **Commands:**
 
 - **`open`** - Create a new session
-  - Generates a session directory: `data/YYYY/MM/DD/HHMM/`
+  - Generates a session directory: `data/sessions/SESSION_CODE/`
   - Creates `session.yml` with:
     - Unique UUID (time-based v7)
     - 6-character alphanumeric code
@@ -314,7 +317,7 @@ exercise_id,turn_id,user_uuid,start_time,stop_time,duration_seconds
    cd ~/mnt/vera
    ./scripts/ses.sh open
    ```
-   Output: `data/2026/11/23/1003` with code `A1B2C3`
+   Output: `data/sessions/A1B2C3` with code `A1B2C3`
 
 3. **Register first participant:**
    ```bash
@@ -361,13 +364,13 @@ exercise_id,turn_id,user_uuid,start_time,stop_time,duration_seconds
 
 ```
 data/
-├── 2026/
-│   └── 11/
-│       └── 23/
-│           └── 1003/
-│               ├── session.yml
-│               ├── subjects.csv
-│               └── exercises.csv
+├── users.csv
+├── sessions.csv
+├── sessions/
+│   └── A1B2C3/
+│       ├── session.yml
+│       ├── subjects.csv
+│       └── exercises.csv
 └── 261123_A1B2C3.exercises.csv  (exported after close)
 ```
 
