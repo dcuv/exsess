@@ -202,14 +202,20 @@ Records the precise start and stop times when each participant performs their as
 
 **Usage:**
 ```bash
-./scripts/ex.sh
+./scripts/ex.sh [--rec | --no-rec]
 ```
+
+**Options:**
+- `-r`, `--rec`: Automatically start and stop webcam/audio recording via `rec.sh` without prompting
+- `--no-rec`: Skip video recording without prompting
+- `-h`, `--help`: Show help message
 
 **Interactive Flow:**
 1. Prompts for Turn ID (numeric input only)
-2. Displays countdown timer (HH:MM:SS format)
-3. Press 'q' or 'Q' to stop the timer
-4. Automatically records elapsed time with ISO 8601 timestamps
+2. Asks whether to record video automatically (unless `--rec` or `--no-rec` is passed)
+3. Starts `rec.sh` (if enabled) and displays live timer (`HH:MM:SS` format)
+4. Press 'q' or 'Q' to stop the timer (and cleanly finalize video recording)
+5. Automatically records elapsed time with ISO 8601 timestamps
 
 **Output:**
 - Appends record to `session_dir/exercises.csv` with:

@@ -1,8 +1,10 @@
 # Sensitive Data - NEVER COMMIT
 ###################################
 
-# Active session marker
+# Active session and recording markers
 .session
+.rec.pid
+.active_turn
 
 # VeraCrypt container files
 *.hc

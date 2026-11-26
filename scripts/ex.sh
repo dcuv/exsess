@@ -1,6 +1,41 @@
-#!/bin/sh
+#!/bin/bash
 
 SESSION_FILE=".session"
+ACTIVE_TURN_FILE=".active_turn"
+SCRIPT_DIR=$(dirname "$0")
+REC_SCRIPT="$SCRIPT_DIR/rec.sh"
+RECORD_VIDEO=""
+
+usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -r, --rec      Automatically record video without prompting"
+    echo "      --no-rec   Skip video recording without prompting"
+    echo "  -h, --help     Show this help message"
+    exit 0
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -r|--rec)
+            RECORD_VIDEO="yes"
+            shift
+            ;;
+        --no-rec)
+            RECORD_VIDEO="no"
+            shift
+            ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            echo "Run '$0 --help' for usage." >&2
+            exit 1
+            ;;
+    esac
+done
 
 # Ensure an active session exists
 if [ ! -f "$SESSION_FILE" ]; then
@@ -69,8 +104,46 @@ while true; do
     clear
 done
 
+# Ask whether to record video if not specified via CLI flags
+if [ -z "$RECORD_VIDEO" ]; then
+    if gum confirm "Record video for Turn ID $TURN_ID?"; then
+        RECORD_VIDEO="yes"
+    else
+        RECORD_VIDEO="no"
+    fi
+fi
+
+RECORDING_ACTIVE=0
+printf '%s\n' "$TURN_ID" > "$ACTIVE_TURN_FILE"
+
+cleanup() {
+    stty echo 2>/dev/null || true
+    if [ "$RECORDING_ACTIVE" -eq 1 ] && [ -x "$REC_SCRIPT" ]; then
+        "$REC_SCRIPT" stop
+        RECORDING_ACTIVE=0
+    fi
+    rm -f "$ACTIVE_TURN_FILE"
+}
+
+trap 'cleanup; exit 130' INT TERM
+
+if [ "$RECORD_VIDEO" = "yes" ]; then
+    if [ ! -x "$REC_SCRIPT" ]; then
+        gum style --foreground 196 "Recording script not found or not executable: $REC_SCRIPT" >&2
+        gum confirm "Continue exercise without video?" || { cleanup; exit 1; }
+    elif "$REC_SCRIPT" start "$TURN_ID"; then
+        RECORDING_ACTIVE=1
+    else
+        gum style --foreground 196 "Failed to start video recording." >&2
+        gum confirm "Continue exercise without video?" || { cleanup; exit 1; }
+    fi
+fi
+
 clear
 gum style --bold "Exercise $EXERCISE_ID Started for Turn ID: $TURN_ID"
+if [ "$RECORDING_ACTIVE" -eq 1 ]; then
+    gum style --foreground 196 --bold "● REC: Video recording active (${SESSION_CODE}_${TURN_ID}.mp4)"
+fi
 echo "Press 'q' to stop the timer."
 echo
 
@@ -100,10 +173,13 @@ while true; do
 done
 stty echo
 
-# Record stop time
+# Record stop time immediately before stopping ffmpeg
 STOP_EPOCH=$(date +%s)
 STOP_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 DURATION=$((STOP_EPOCH - START_EPOCH))
+
+VIDEO_RECORDED=$RECORDING_ACTIVE
+cleanup
 
 # Generate exercise_uuid with session code as prefix
 EXERCISE_UUID="${SESSION_CODE}_$(printf '%02d' "$EX_NUM")"
@@ -122,3 +198,6 @@ printf '%s,%s,%s,%s,%s,%s,%s\n' \
 clear
 echo
 gum style --foreground 46 --bold "Exercise $EXERCISE_ID saved successfully! Duration: ${DURATION}s"
+if [ "$VIDEO_RECORDED" -eq 1 ]; then
+    gum style --foreground 46 "Video recording saved (${SESSION_CODE}_${TURN_ID}.mp4)."
+fi
