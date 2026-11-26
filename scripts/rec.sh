@@ -11,7 +11,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-$HOME/Videos/exsess}"
 # e.g.: VIDEO_DEV=/dev/video1 VIDEO_SIZE=1920x1080 ./scripts/rec.sh start 01
 VIDEO_DEV="${VIDEO_DEV:-/dev/video1}"
 VIDEO_SIZE="${VIDEO_SIZE:-1920x1080}"
-FRAMERATE="${FRAMERATE:-30}"
+FRAMERATE="${FRAMERATE:-60}"
 INPUT_FORMAT="${INPUT_FORMAT:-mjpeg}"
 
 # Audio configuration
@@ -33,7 +33,7 @@ usage() {
     echo "  OUTPUT_DIR       Destination directory (default: ~/Videos/exsess)"
     echo "  VIDEO_DEV        Camera device node (default: /dev/video1)"
     echo "  VIDEO_SIZE       Capture resolution (default: 1920x1080)"
-    echo "  FRAMERATE        Capture framerate (default: 30)"
+    echo "  FRAMERATE        Capture framerate (default: 60)"
     echo "  INPUT_FORMAT     Camera input format (default: mjpeg)"
     echo "  AUDIO_SOURCE     Audio system: 'pulse' (default), 'alsa', or 'none'"
     echo "  AUDIO_DEV        Audio device name (default: 'default', or e.g. 'hw:Camera,0')"
